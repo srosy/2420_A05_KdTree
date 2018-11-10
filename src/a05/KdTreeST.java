@@ -2,7 +2,7 @@
  * Author: Spencer Rosenvall
  * Class: CSIS 2420
  * Professor: Frau Posch
- * Assignment: A05_KdTree
+ * Assignment: A05_KdTreeST
  ****************************/
 
 package a05;
@@ -12,55 +12,43 @@ import edu.princeton.cs.algs4.Queue;
 import edu.princeton.cs.algs4.RectHV;
 
 /**
- * Class kdTreeST creates a binary tree using a series of Node objects defined
- * withing private class Node.
+ * Class kdTreeST represents a tree using symbol table, values, and point2d.
  * 
  * @author SpencerR
- *
+ * @param <Value>
  */
 public class KdTreeST<Value> {
+	private int size;
+	private Node root;
 
 	/**
-	 * Class Node determines the type of node to be placed in the tree. It takes a
-	 * Point2D point and sets vertical propoerty.
+	 * Private helper class to define node and its properties.
 	 * 
 	 * @author SpencerR
 	 *
 	 */
-	private static class Node<Value> {
-		private Point2D point;
+	private class Node {
+		private Node l; // left
+		private Node r; // right
 		private Value value;
-		private Node<Value> tr; // topRight
-		private Node<Value> bl; // bottomLeft
-		private boolean isVertical;
+		private RectHV rect;
+		private Point2D p;
 
-		/**
-		 * Constructs the node from the parameters p<Point2D> and vert.
-		 * 
-		 * @param p
-		 * @param vert
-		 */
-		public Node(Point2D p, Value val, boolean vert) {
-			this.point = p;
-			this.isVertical = vert;
-			this.value = val;
-			bl = null;
-			tr = null;
+		public Node(Point2D point, Value value, RectHV rectangle) {
+			this.p = point;
+			this.value = value;
+			this.rect = rectangle;
 		}
 	}
 
-	private Node<Value> root;
-	private int size;
-
 	/**
-	 * Construct an empty set of points.
+	 * Constructs an empty symbol table of points.
 	 */
 	public KdTreeST() {
-		// empty => (int default = 0, Object default = null)
 	}
 
 	/**
-	 * Checks if the set is empty.
+	 * Determines if symbol table is empty.
 	 * 
 	 * @return boolean
 	 */
@@ -69,7 +57,7 @@ public class KdTreeST<Value> {
 	}
 
 	/**
-	 * Returns the number of points in the set.
+	 * Returns the number of points.
 	 * 
 	 * @return int
 	 */
@@ -78,232 +66,238 @@ public class KdTreeST<Value> {
 	}
 
 	/**
-	 * Associates the value with point p.
+	 * * Associates the value val with point p.
 	 * 
 	 * @param p
+	 * @param val
 	 */
 	public void put(Point2D p, Value val) {
-		if (p == null)
-			throw new NullPointerException();
-		root = insert(root, p, val, true);
+		if (p == null || val == null)
+			throw new NullPointerException("Param cannot be null");
+		root = put(null, root, p, true, val);
 	}
 
 	/**
-	 * Inserts a node with point p, determines if node is vertical.
+	 * Creates and places node in the tree.
+	 * 
+	 * @param preceeding
+	 * @param n
+	 * @param p
+	 * @param isHorizontal
+	 * @param v
+	 * @return Node
+	 */
+	private Node put(Node preceeding, Node n, Point2D p, boolean isHorizontal, Value v) {
+		if (n == null) {
+			size++;
+			return new Node(p, v, getRect(preceeding, p, isHorizontal));
+		}
+		double comparedResult = compare(n, p, isHorizontal);
+
+		if (comparedResult < 0) {
+			n.l = put(n, n.l, p, !isHorizontal, v);
+		} else if (comparedResult > 0) {
+			n.r = put(n, n.r, p, !isHorizontal, v);
+		} else if (n.p.equals(p)) {
+			n.value = v;
+		} else {
+			n.r = put(n, n.r, p, !isHorizontal, v);
+		}
+		return n;
+	}
+
+	/**
+	 * Compares the coordinates of the passed point and node.
+	 * 
+	 * @param node
+	 * @param point
+	 * @param horizontal
+	 * @return int
+	 */
+	private int compare(KdTreeST<Value>.Node node, Point2D point, boolean horizontal) {
+		double result = 0;
+		if (horizontal) {
+			result = point.x() - node.p.x() > 0 ? 1 : -1;
+			result = point.x() - node.p.x() == 0 ? 0 : result;
+		} else {
+			result = point.y() - node.p.y() > 0 ? 1 : -1;
+			result = point.y() - node.p.y() == 0 ? 0 : result;
+		}
+		return (int) result;
+	}
+
+	/**
+	 * Creates a rectangle from the arguments passed.
+	 * 
+	 * @param preceeding
+	 * @param p
+	 * @param isHorizontal
+	 * @return RectHV
+	 */
+	private RectHV getRect(Node preceeding, Point2D p, boolean isHorizontal) {
+		if (preceeding == null) {
+			return new RectHV(-Double.MAX_VALUE, -Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE);
+		}
+		int comp = compare(preceeding, p, !isHorizontal);
+
+		if (comp >= 0 && isHorizontal) {
+			return new RectHV(preceeding.rect.xmin(), preceeding.p.y(), preceeding.rect.xmax(), preceeding.rect.ymax());
+		}
+
+		if (comp >= 0 && !isHorizontal) {
+			return new RectHV(preceeding.p.x(), preceeding.rect.ymin(), preceeding.rect.xmax(), preceeding.rect.ymax());
+		}
+
+		if (comp < 0 && isHorizontal) {
+			return new RectHV(preceeding.rect.xmin(), preceeding.rect.ymin(), preceeding.rect.xmax(), preceeding.p.y());
+		}
+
+		if (comp < 0 && !isHorizontal) {
+			return new RectHV(preceeding.rect.xmin(), preceeding.rect.ymin(), preceeding.p.x(), preceeding.rect.ymax());
+		}
+		return null;
+	}
+
+	/**
+	 * Returns the value associated with point p.
+	 * 
+	 * @param p
+	 * @return Value
+	 */
+	public Value get(Point2D p) {
+		if (p == null) {
+			throw new NullPointerException("p cannot be null");
+		}
+		return get(root, p, true);
+	}
+
+	/**
+	 * Helper method that compares and locates Point2D p.
 	 * 
 	 * @param node
 	 * @param p
-	 * @param isVertical
-	 * @return Node
+	 * @param isHorizontal
+	 * @return Value
 	 */
-	private Node<Value> insert(Node<Value> node, Point2D p, Value val, boolean isVertical) {
-		int result;
+	private Value get(Node node, Point2D p, boolean isHorizontal) {
+		if (node == null)
+			return null;
+		double comp = compare(node, p, isHorizontal);
 
-		if (node == null) {
-			size++;
-			return new Node<Value>(p, val, isVertical);
-		}
-
-		if (p.equals(node.point))
-			return node;
-
-		if (node.isVertical) {
-			result = orderByX(p, node.point);
-		} else {
-			result = orderByY(p, node.point);
-		}
-
-		if (result < 0) {
-			node.bl = insert(node.bl, p, val, !node.isVertical);
-		} else {
-			node.tr = insert(node.tr, p, val, !node.isVertical);
-		}
-
-		return node;
+		if (node.p.equals(p))
+			return node.value;
+		if (comp < 0)
+			return get(node.l, p, !isHorizontal);
+		if (comp > 0)
+			return get(node.r, p, !isHorizontal);
+		return get(node.r, p, !isHorizontal);
 	}
 
 	/**
-	 * Orders two points by comparing their x value.
-	 * 
-	 * @param point1
-	 * @param point2
-	 * @return int
-	 */
-	private int orderByX(Point2D point1, Point2D point2) {
-		if (point1.x() > point2.x())
-			return 1;
-		if (point1.x() < point2.x())
-			return -1;
-		return 0;
-	}
-
-	/**
-	 * Orders two points by comparing their y value.
-	 * 
-	 * @param p1
-	 * @param p2
-	 * @return int
-	 */
-	private int orderByY(Point2D p1, Point2D p2) {
-		if (p1.y() > p2.y())
-			return 1;
-		if (p1.y() < p2.y())
-			return -1;
-		return 0;
-	}
-
-	/**
-	 * Checks if the set contain point p.
+	 * Determines if symbol table contains point p.
 	 * 
 	 * @param p
 	 * @return boolean
 	 */
 	public boolean contains(Point2D p) {
 		if (p == null)
-			throw new NullPointerException();
-		Node<Value> node = root;
-		int result;
-		while (node != null) {
-			if (p.equals(node.point)) {
-				return true;
-			}
-			if (node.isVertical) {
-				result = orderByX(p, node.point);
-			} else {
-				result = orderByY(p, node.point);
-			}
-			if (result < 0)
-				node = node.bl;
-			else
-				node = node.tr;
-		}
-		return false;
+			throw new NullPointerException("p cannot be null");
+		return get(p) != null;
 	}
 
 	/**
-	 * Iterates through all points that are inside the rectangle to determine the
-	 * range.
+	 * Iterates the points in the symbol table.
+	 * 
+	 * @return Iterable<Point2D>
+	 */
+	public Iterable<Point2D> points() {
+		Queue<Point2D> p2dQ = new Queue<Point2D>();
+		Queue<Node> nQ = new Queue<Node>();
+		nQ.enqueue(root);
+
+		while (!nQ.isEmpty()) {
+			Node x = nQ.dequeue();
+			p2dQ.enqueue(x.p);
+			nQ.enqueue(x.r);
+			nQ.enqueue(x.l);
+		}
+		return p2dQ;
+	}
+
+	/**
+	 * Iterates the points inside rectangle bounds.
 	 * 
 	 * @param rect
 	 * @return Iterable<Point2D>
 	 */
 	public Iterable<Point2D> range(RectHV rect) {
-		if (rect == null) {
-			throw new NullPointerException();
-		}
-		Queue<Point2D> q = new Queue<Point2D>();
-		range(root, new RectHV(0, 0, 1, 1), rect, q);
-		return q;
+		if (rect == null)
+			throw new NullPointerException("rect cannot be null");
+
+		Queue<Point2D> rQ = new Queue<Point2D>();
+		range(rect, rQ, root);
+		return rQ;
 	}
 
 	/**
-	 * Checks if node rectangle and query rectange intersects, helps parent range
-	 * method.
+	 * Helper method for range that enqeues.
 	 * 
-	 * @param node
-	 * @param nRect
-	 * @param qRect
+	 * @param r
 	 * @param q
+	 * @param n
 	 */
-	private void range(Node<Value> node, RectHV nRect, RectHV qRect, Queue<Point2D> q) {
-		if (node == null)
+	private void range(RectHV r, Queue<Point2D> q, KdTreeST<Value>.Node n) {
+		if (n == null)
 			return;
-		if (qRect.intersects(nRect)) {
-			if (qRect.contains(node.point)) {
-				q.enqueue(node.point);
-			}
-			range(node.bl, createLeftRect(node, nRect), qRect, q);
-			range(node.tr, createRightRect(node, nRect), qRect, q);
-		}
+		if (r.contains(n.p))
+			q.enqueue(n.p);
+		range(r, q, n.r);
+		range(r, q, n.l);
 	}
 
 	/**
-	 * Returns the nearest Point2D point.
+	 * Returns the nearest neighbor to point p.
 	 * 
 	 * @param p
 	 * @return Point2D
 	 */
 	public Point2D nearest(Point2D p) {
 		if (p == null)
-			throw new NullPointerException();
-
-		if (contains(p))
-			return p;
-
-		return nearest(root, new RectHV(0, 0, 1, 1), p, null);
+			throw new NullPointerException("p cannot be null");
+		return nearest(p, root, root.p);
 	}
 
 	/**
-	 * Helps parent method determine the closest node.
+	 * Helper method, locates the nearest neighbor to point p.
 	 * 
-	 * @param node
-	 * @param r
 	 * @param p
-	 * @param pFinal
-	 * @return Point2D
+	 * @param n
+	 * @param p2D
+	 * @return point2D
 	 */
-	private Point2D nearest(Node<Value> node, RectHV r, Point2D p, Point2D pFinal) {
-		if (node == null)
-			return pFinal;
+	private Point2D nearest(Point2D p, Node n, Point2D p2D) {
+		if (n == null)
+			return p2D;
+		if (n.rect.distanceSquaredTo(p) > p2D.distanceSquaredTo(p))
+			return p2D;
+		if (p.distanceSquaredTo(n.p) < p.distanceSquaredTo(p2D))
+			p2D = n.p;
 
-		Point2D goal = pFinal;
-		double closest = goal != null ? p.distanceSquaredTo(goal) : Double.MAX_VALUE;
-
-		if (closest > r.distanceSquaredTo(p)) {
-			double distance = p.distanceSquaredTo(node.point);
-			if (distance < closest)
-				goal = node.point;
-
-			int result;
-			RectHV left = createLeftRect(node, r);
-			RectHV right = createRightRect(node, r);
-			if (node.isVertical) {
-				result = orderByX(p, node.point);
-			} else {
-				result = orderByY(p, node.point);
-			}
-
-			if (result < 0) {
-				goal = nearest(node.bl, left, p, goal);
-				goal = nearest(node.tr, right, p, goal);
-			} else {
-				goal = nearest(node.tr, right, p, goal);
-				goal = nearest(node.bl, left, p, goal);
-			}
+		if (n.l != null && n.l.rect.contains(p)) {
+			p2D = nearest(p, n.l, p2D);
+			p2D = nearest(p, n.r, p2D);
+		} else {
+			p2D = nearest(p, n.r, p2D);
+			p2D = nearest(p, n.l, p2D);
 		}
-		return goal;
+		return p2D;
 	}
 
 	/**
-	 * Creates the left rectangle. ************** Check if needed still, watch vid.
-	 * 
-	 * @param node
-	 * @param r
-	 * @return RectHV
-	 */
-	private RectHV createLeftRect(Node node, RectHV r) {
-		return node.isVertical ? new RectHV(r.xmin(), r.ymin(), node.point.x(), r.ymax())
-				: new RectHV(r.xmin(), r.ymin(), r.xmax(), node.point.y());
-	}
-
-	/**
-	 * Creates the right rectangle. *********** Check if needed still, watch vid.
-	 * 
-	 * @param node
-	 * @param r
-	 * @return RectHV
-	 */
-	private RectHV createRightRect(Node node, RectHV r) {
-		return node.isVertical ? new RectHV(node.point.x(), r.ymin(), r.xmax(), r.ymax())
-				: new RectHV(r.xmin(), node.point.y(), r.xmax(), r.ymax());
-	}
-
-	/**
-	 * Unit testing of the methods (optional).
+	 * Unit testing of the methods (not graded).
 	 * 
 	 * @param args
 	 */
 	public static void main(String[] args) {
 	}
-
 }
